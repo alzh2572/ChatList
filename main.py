@@ -29,7 +29,7 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(container)
 
     def on_button_clicked(self) -> None:
-        self.label.setText("Кнопка нажата!")
+        self.label.setText("Минимальная программа на Python")
 
 
 def main() -> None:
