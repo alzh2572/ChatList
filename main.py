@@ -1,6 +1,13 @@
 import sys
 
-from PyQt6.QtWidgets import QApplication, QLabel, QMainWindow, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import (
+    QApplication,
+    QLabel,
+    QMainWindow,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+)
 
 
 class MainWindow(QMainWindow):
@@ -9,13 +16,20 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("ChatList")
         self.resize(400, 200)
 
-        label = QLabel("Минимальное приложение на PyQt6")
-        label.setStyleSheet("font-size: 16px; padding: 20px;")
+        self.label = QLabel("Минимальное приложение на PyQt6")
+        self.label.setStyleSheet("font-size: 16px; padding: 20px;")
+
+        button = QPushButton("Нажми меня")
+        button.clicked.connect(self.on_button_clicked)
 
         container = QWidget()
         layout = QVBoxLayout(container)
-        layout.addWidget(label)
+        layout.addWidget(self.label)
+        layout.addWidget(button)
         self.setCentralWidget(container)
+
+    def on_button_clicked(self) -> None:
+        self.label.setText("Кнопка нажата!")
 
 
 def main() -> None:
