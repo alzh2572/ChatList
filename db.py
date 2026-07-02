@@ -49,18 +49,20 @@ CREATE INDEX IF NOT EXISTS idx_results_created_at ON results(created_at);
 
 SEED_MODELS = [
     {
-        "name": "gpt-4o-mini",
-        "api_url": "https://api.openai.com/v1/chat/completions",
-        "api_id": "OPENAI_API_KEY",
+        "name": "openai/gpt-4o-mini",
+        "api_url": "https://openrouter.ai/api/v1/chat/completions",
+        "api_id": "OPENROUTER_API_KEY",
         "is_active": 1,
     },
     {
-        "name": "deepseek-chat",
-        "api_url": "https://api.deepseek.com/v1/chat/completions",
-        "api_id": "DEEPSEEK_API_KEY",
+        "name": "deepseek/deepseek-chat",
+        "api_url": "https://openrouter.ai/api/v1/chat/completions",
+        "api_id": "OPENROUTER_API_KEY",
         "is_active": 1,
     },
 ]
+
+OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 DEFAULT_SETTINGS = {
     "db_path": "chatlist.db",
@@ -77,6 +79,11 @@ def _row_to_dict(row: sqlite3.Row) -> dict[str, Any]:
     return dict(row)
 
 
+def get_db_path() -> Path:
+    configured = get_setting("db_path", str(DEFAULT_DB_PATH))
+    return Path(configured or DEFAULT_DB_PATH)
+
+
 def get_connection(db_path: Path | str | None = None) -> sqlite3.Connection:
     path = Path(db_path or DEFAULT_DB_PATH)
     conn = sqlite3.connect(path)
@@ -90,6 +97,7 @@ def init_db(db_path: Path | str | None = None) -> None:
     try:
         conn.executescript(SCHEMA_SQL)
         _seed_defaults(conn)
+        _ensure_openrouter_models(conn)
         conn.commit()
     finally:
         conn.close()
@@ -112,6 +120,24 @@ def _seed_defaults(conn: sqlite3.Connection) -> None:
                 """,
                 (model["name"], model["api_url"], model["api_id"], model["is_active"]),
             )
+
+
+def _ensure_openrouter_models(conn: sqlite3.Connection) -> None:
+    count = conn.execute(
+        "SELECT COUNT(*) FROM models WHERE api_url = ?",
+        (OPENROUTER_API_URL,),
+    ).fetchone()[0]
+    if count > 0:
+        return
+
+    for model in SEED_MODELS:
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO models (name, api_url, api_id, is_active)
+            VALUES (?, ?, ?, ?)
+            """,
+            (model["name"], model["api_url"], model["api_id"], model["is_active"]),
+        )
 
 
 # --- prompts ---
@@ -163,6 +189,39 @@ def search_prompts(query: str, db_path: Path | str | None = None) -> list[dict[s
             (pattern, pattern),
         ).fetchall()
         return [_row_to_dict(row) for row in rows]
+    finally:
+        conn.close()
+
+
+def update_prompt(
+    prompt_id: int,
+    *,
+    prompt: str | None = None,
+    tags: str | None = None,
+    db_path: Path | str | None = None,
+) -> bool:
+    fields: list[str] = []
+    values: list[Any] = []
+
+    if prompt is not None:
+        fields.append("prompt = ?")
+        values.append(prompt)
+    if tags is not None:
+        fields.append("tags = ?")
+        values.append(tags)
+
+    if not fields:
+        return False
+
+    values.append(prompt_id)
+    conn = get_connection(db_path)
+    try:
+        cursor = conn.execute(
+            f"UPDATE prompts SET {', '.join(fields)} WHERE id = ?",
+            values,
+        )
+        conn.commit()
+        return cursor.rowcount > 0
     finally:
         conn.close()
 
@@ -364,6 +423,36 @@ def get_results_by_prompt(
         conn.close()
 
 
+def search_results(query: str, db_path: Path | str | None = None) -> list[dict[str, Any]]:
+    conn = get_connection(db_path)
+    try:
+        pattern = f"%{query}%"
+        rows = conn.execute(
+            """
+            SELECT r.*, p.prompt, m.name AS model_name
+            FROM results r
+            JOIN prompts p ON p.id = r.prompt_id
+            JOIN models m ON m.id = r.model_id
+            WHERE r.response LIKE ? OR p.prompt LIKE ? OR m.name LIKE ?
+            ORDER BY r.created_at DESC
+            """,
+            (pattern, pattern, pattern),
+        ).fetchall()
+        return [_row_to_dict(row) for row in rows]
+    finally:
+        conn.close()
+
+
+def delete_result(result_id: int, db_path: Path | str | None = None) -> bool:
+    conn = get_connection(db_path)
+    try:
+        cursor = conn.execute("DELETE FROM results WHERE id = ?", (result_id,))
+        conn.commit()
+        return cursor.rowcount > 0
+    finally:
+        conn.close()
+
+
 # --- settings ---
 
 
@@ -376,6 +465,15 @@ def get_setting(key: str, default: str | None = None, db_path: Path | str | None
         if row is None:
             return default
         return str(row["value"])
+    finally:
+        conn.close()
+
+
+def list_settings(db_path: Path | str | None = None) -> dict[str, str]:
+    conn = get_connection(db_path)
+    try:
+        rows = conn.execute("SELECT key, value FROM settings ORDER BY key").fetchall()
+        return {str(row["key"]): str(row["value"]) for row in rows}
     finally:
         conn.close()
 

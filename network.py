@@ -8,7 +8,10 @@ from dataclasses import dataclass
 import httpx
 
 import db
+from log_utils import get_logger
 from models import AIModel, load_api_key
+
+logger = get_logger()
 
 
 @dataclass
@@ -51,17 +54,23 @@ def send_prompt_to_model(
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
     }
+    if "openrouter.ai" in model.api_url:
+        headers["HTTP-Referer"] = "https://github.com/ChatList"
+        headers["X-Title"] = "ChatList"
+
     payload = {
         "model": model.name,
         "messages": [{"role": "user", "content": prompt}],
     }
 
     try:
+        logger.info("Запрос к модели %s (%s)", model.name, model.api_url)
         with httpx.Client(timeout=timeout) as client:
             response = client.post(model.api_url, json=payload, headers=headers)
             response.raise_for_status()
             data = response.json()
         text = _extract_openai_compatible_content(data)
+        logger.info("Успешный ответ от модели %s (%d символов)", model.name, len(text))
         return ModelResponse(
             model_id=model.id,
             model_name=model.name,
@@ -69,6 +78,7 @@ def send_prompt_to_model(
         )
     except httpx.HTTPStatusError as exc:
         detail = exc.response.text.strip() or str(exc)
+        logger.error("HTTP-ошибка модели %s: %s", model.name, detail)
         return ModelResponse(
             model_id=model.id,
             model_name=model.name,
@@ -76,6 +86,7 @@ def send_prompt_to_model(
             error=f"HTTP {exc.response.status_code}: {detail}",
         )
     except httpx.RequestError as exc:
+        logger.error("Сетевая ошибка модели %s: %s", model.name, exc)
         return ModelResponse(
             model_id=model.id,
             model_name=model.name,
@@ -83,6 +94,7 @@ def send_prompt_to_model(
             error=f"Ошибка сети: {exc}",
         )
     except (ValueError, KeyError, IndexError) as exc:
+        logger.error("Ошибка разбора ответа модели %s: %s", model.name, exc)
         return ModelResponse(
             model_id=model.id,
             model_name=model.name,
