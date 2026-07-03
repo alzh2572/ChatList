@@ -63,6 +63,12 @@ OPENROUTER_MODELS = [
         "api_id": "OPENROUTER_API_KEY",
         "is_active": 1,
     },
+    {
+        "name": "nvidia/nemotron-3-ultra-550b-a55b:free",
+        "api_url": OPENROUTER_API_URL,
+        "api_id": "OPENROUTER_API_KEY",
+        "is_active": 1,
+    },
 ]
 
 SEED_MODELS = OPENROUTER_MODELS
