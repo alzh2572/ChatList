@@ -25,6 +25,7 @@ import db
 from export_utils import default_export_path, export_to_json, export_to_markdown
 from gui_tabs import HistoryTab, ModelsTab, PromptsTab, SettingsTab
 from log_utils import get_logger
+from markdown_viewer import MarkdownViewDialog, format_response_markdown
 from models import get_active_models
 from network import ModelResponse, send_prompt_to_all_models
 from session import QuerySession
@@ -111,6 +112,8 @@ class QueryTab(QWidget):
         setup_multiline_table(self.results_table)
         self.results_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.results_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.results_table.itemSelectionChanged.connect(self._update_action_buttons)
+        self.results_table.cellDoubleClicked.connect(self._on_open_response)
         connect_search(self.results_table, self.results_search, [0, 1])
 
         section_layout.addWidget(QLabel("Результаты:"))
@@ -135,10 +138,15 @@ class QueryTab(QWidget):
         self.export_json_button.clicked.connect(lambda: self._export_results("json"))
         self.export_json_button.setEnabled(False)
 
+        self.open_button = QPushButton("Открыть")
+        self.open_button.clicked.connect(self._on_open_response)
+        self.open_button.setEnabled(False)
+
         self.new_button = QPushButton("Новый запрос")
         self.new_button.clicked.connect(self._on_new_query)
 
         row.addWidget(self.save_button)
+        row.addWidget(self.open_button)
         row.addWidget(self.export_md_button)
         row.addWidget(self.export_json_button)
         row.addWidget(self.new_button)
@@ -261,6 +269,28 @@ class QueryTab(QWidget):
             return
         self.session.set_selected(item.row(), item.checkState() == Qt.CheckState.Checked)
 
+    def _on_open_response(self, row: int = -1, _column: int = -1) -> None:
+        if row < 0:
+            row = self.results_table.currentRow()
+        if row < 0:
+            QMessageBox.information(self, "ChatList", "Выберите строку с ответом.")
+            return
+
+        model_item = self.results_table.item(row, 0)
+        response_item = self.results_table.item(row, 1)
+        if model_item is None or response_item is None:
+            return
+
+        model_name = model_item.text()
+        response = response_item.text()
+        markdown = format_response_markdown(
+            model_name,
+            self.session.prompt_text,
+            response,
+        )
+        dialog = MarkdownViewDialog(f"Ответ — {model_name}", markdown, self)
+        dialog.exec()
+
     def _collect_export_items(self) -> list[dict]:
         selected = self.session.get_selected_rows()
         rows = selected or self.session.rows
@@ -354,12 +384,15 @@ class QueryTab(QWidget):
         self.new_button.setEnabled(not loading)
         if loading:
             self.save_button.setEnabled(False)
+            self.open_button.setEnabled(False)
             self.export_md_button.setEnabled(False)
             self.export_json_button.setEnabled(False)
 
     def _update_action_buttons(self) -> None:
         has_results = self.session.has_results()
+        has_selection = self.results_table.currentRow() >= 0
         self.save_button.setEnabled(has_results)
+        self.open_button.setEnabled(has_results and has_selection)
         self.export_md_button.setEnabled(has_results)
         self.export_json_button.setEnabled(has_results)
 
@@ -409,7 +442,7 @@ class MainWindow(QMainWindow):
                     background-color: #1e1e1e;
                     color: #e0e0e0;
                 }
-                QLineEdit, QPlainTextEdit, QComboBox, QTableWidget, QSpinBox {
+                QLineEdit, QPlainTextEdit, QComboBox, QTableWidget, QSpinBox, QTextBrowser {
                     background-color: #2d2d2d;
                     color: #e0e0e0;
                     border: 1px solid #444;
