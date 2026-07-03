@@ -47,22 +47,25 @@ CREATE INDEX IF NOT EXISTS idx_results_model_id  ON results(model_id);
 CREATE INDEX IF NOT EXISTS idx_results_created_at ON results(created_at);
 """
 
-SEED_MODELS = [
+OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
+
+# Модели OpenRouter (бесплатные)
+OPENROUTER_MODELS = [
     {
-        "name": "openai/gpt-4o-mini",
-        "api_url": "https://openrouter.ai/api/v1/chat/completions",
+        "name": "poolside/laguna-xs-2.1:free",
+        "api_url": OPENROUTER_API_URL,
         "api_id": "OPENROUTER_API_KEY",
         "is_active": 1,
     },
     {
-        "name": "deepseek/deepseek-chat",
-        "api_url": "https://openrouter.ai/api/v1/chat/completions",
+        "name": "cohere/north-mini-code:free",
+        "api_url": OPENROUTER_API_URL,
         "api_id": "OPENROUTER_API_KEY",
         "is_active": 1,
     },
 ]
 
-OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
+SEED_MODELS = OPENROUTER_MODELS
 
 DEFAULT_SETTINGS = {
     "db_path": "chatlist.db",
@@ -123,14 +126,9 @@ def _seed_defaults(conn: sqlite3.Connection) -> None:
 
 
 def _ensure_openrouter_models(conn: sqlite3.Connection) -> None:
-    count = conn.execute(
-        "SELECT COUNT(*) FROM models WHERE api_url = ?",
-        (OPENROUTER_API_URL,),
-    ).fetchone()[0]
-    if count > 0:
-        return
+    allowed = {model["name"] for model in OPENROUTER_MODELS}
 
-    for model in SEED_MODELS:
+    for model in OPENROUTER_MODELS:
         conn.execute(
             """
             INSERT OR IGNORE INTO models (name, api_url, api_id, is_active)
@@ -138,6 +136,25 @@ def _ensure_openrouter_models(conn: sqlite3.Connection) -> None:
             """,
             (model["name"], model["api_url"], model["api_id"], model["is_active"]),
         )
+        conn.execute(
+            """
+            UPDATE models
+            SET api_url = ?, api_id = ?, is_active = ?
+            WHERE name = ?
+            """,
+            (model["api_url"], model["api_id"], model["is_active"], model["name"]),
+        )
+
+    extra = conn.execute(
+        "SELECT id, name FROM models WHERE name NOT IN ({})".format(
+            ",".join("?" * len(allowed))
+        ),
+        list(allowed),
+    ).fetchall()
+
+    for row in extra:
+        conn.execute("DELETE FROM results WHERE model_id = ?", (row["id"],))
+        conn.execute("DELETE FROM models WHERE id = ?", (row["id"],))
 
 
 # --- prompts ---

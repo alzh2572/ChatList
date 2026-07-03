@@ -38,12 +38,12 @@ OPENROUTER_API_KEY=sk-or-v1-ваш-ключ
 python main.py
 ```
 
-При первом запуске создаётся база `chatlist.db` с моделями OpenRouter:
+При первом запуске создаётся база `chatlist.db` с двумя бесплатными моделями OpenRouter:
 
-- `openai/gpt-4o-mini`
-- `deepseek/deepseek-chat`
+- `poolside/laguna-xs-2.1:free`
+- `cohere/north-mini-code:free`
 
-Модели можно добавлять и редактировать на вкладке **Модели**.
+Модели можно просматривать на вкладке **Модели**.
 
 ## Структура проекта
 
