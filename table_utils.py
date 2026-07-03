@@ -2,12 +2,27 @@
 
 from __future__ import annotations
 
-from PyQt6.QtWidgets import QLineEdit, QTableWidget
+from PyQt6.QtWidgets import QHeaderView, QLineEdit, QTableWidget
 
 
 def setup_sortable_table(table: QTableWidget) -> None:
     table.setSortingEnabled(True)
     table.setAlternatingRowColors(True)
+
+
+def setup_multiline_table(table: QTableWidget, min_row_height: int = 96) -> None:
+    table.setWordWrap(True)
+    table.verticalHeader().setMinimumSectionSize(min_row_height)
+    table.verticalHeader().setSectionResizeMode(
+        QHeaderView.ResizeMode.ResizeToContents
+    )
+
+
+def resize_table_rows(table: QTableWidget, min_row_height: int = 96) -> None:
+    table.resizeRowsToContents()
+    for row_index in range(table.rowCount()):
+        if table.rowHeight(row_index) < min_row_height:
+            table.setRowHeight(row_index, min_row_height)
 
 
 def connect_search(table: QTableWidget, search_input: QLineEdit, columns: list[int]) -> None:

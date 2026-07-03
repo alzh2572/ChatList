@@ -28,7 +28,7 @@ from log_utils import get_logger
 from models import get_active_models
 from network import ModelResponse, send_prompt_to_all_models
 from session import QuerySession
-from table_utils import connect_search, setup_sortable_table
+from table_utils import connect_search, resize_table_rows, setup_multiline_table, setup_sortable_table
 
 logger = get_logger()
 
@@ -108,6 +108,7 @@ class QueryTab(QWidget):
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
         setup_sortable_table(self.results_table)
+        setup_multiline_table(self.results_table)
         self.results_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.results_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         connect_search(self.results_table, self.results_search, [0, 1])
@@ -232,6 +233,9 @@ class QueryTab(QWidget):
         for row_index, row in enumerate(self.session.rows):
             model_item = QTableWidgetItem(row.model_name)
             response_item = QTableWidgetItem(row.response)
+            response_item.setTextAlignment(
+                Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop
+            )
             if row.error:
                 response_item.setForeground(Qt.GlobalColor.red)
 
@@ -247,6 +251,7 @@ class QueryTab(QWidget):
             self.results_table.setItem(row_index, 1, response_item)
             self.results_table.setItem(row_index, 2, select_item)
 
+        resize_table_rows(self.results_table)
         self.results_table.setSortingEnabled(True)
         self.results_table.itemChanged.connect(self._on_result_item_changed)
         self._update_action_buttons()
