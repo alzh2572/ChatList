@@ -10,19 +10,26 @@ def setup_sortable_table(table: QTableWidget) -> None:
     table.setAlternatingRowColors(True)
 
 
+MAX_ROW_HEIGHT = 220
+
+
 def setup_multiline_table(table: QTableWidget, min_row_height: int = 96) -> None:
     table.setWordWrap(True)
+    table.verticalHeader().setDefaultSectionSize(min_row_height)
     table.verticalHeader().setMinimumSectionSize(min_row_height)
-    table.verticalHeader().setSectionResizeMode(
-        QHeaderView.ResizeMode.ResizeToContents
-    )
+    table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
 
 
-def resize_table_rows(table: QTableWidget, min_row_height: int = 96) -> None:
+def resize_table_rows(
+    table: QTableWidget,
+    min_row_height: int = 96,
+    max_row_height: int = MAX_ROW_HEIGHT,
+) -> None:
     table.resizeRowsToContents()
     for row_index in range(table.rowCount()):
-        if table.rowHeight(row_index) < min_row_height:
-            table.setRowHeight(row_index, min_row_height)
+        height = max(table.rowHeight(row_index), min_row_height)
+        height = min(height, max_row_height)
+        table.setRowHeight(row_index, height)
 
 
 def connect_search(table: QTableWidget, search_input: QLineEdit, columns: list[int]) -> None:

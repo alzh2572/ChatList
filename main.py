@@ -3,6 +3,7 @@ import sys
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtWidgets import (
     QApplication,
+    QCheckBox,
     QComboBox,
     QFileDialog,
     QHBoxLayout,
@@ -29,7 +30,7 @@ from markdown_viewer import MarkdownViewDialog, format_response_markdown
 from models import get_active_models
 from network import ModelResponse, send_prompt_to_all_models
 from session import QuerySession
-from table_utils import connect_search, resize_table_rows, setup_multiline_table, setup_sortable_table
+from table_utils import connect_search, resize_table_rows, setup_multiline_table
 
 logger = get_logger()
 
@@ -107,8 +108,10 @@ class QueryTab(QWidget):
         header.setStretchLastSection(False)
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
-        setup_sortable_table(self.results_table)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Fixed)
+        self.results_table.setColumnWidth(2, 90)
+        self.results_table.setSortingEnabled(False)
+        self.results_table.setAlternatingRowColors(True)
         setup_multiline_table(self.results_table)
         self.results_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.results_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
@@ -235,7 +238,7 @@ class QueryTab(QWidget):
         QMessageBox.critical(self, "ChatList", f"Не удалось выполнить запрос:\n{message}")
 
     def _populate_results_table(self) -> None:
-        self.results_table.setSortingEnabled(False)
+        self.results_table.clearContents()
         self.results_table.setRowCount(len(self.session.rows))
 
         for row_index, row in enumerate(self.session.rows):
@@ -244,30 +247,43 @@ class QueryTab(QWidget):
             response_item.setTextAlignment(
                 Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop
             )
+            response_item.setToolTip(row.response)
             if row.error:
                 response_item.setForeground(Qt.GlobalColor.red)
 
-            select_item = QTableWidgetItem()
-            select_item.setFlags(
-                Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled
-            )
-            select_item.setCheckState(
-                Qt.CheckState.Checked if row.selected else Qt.CheckState.Unchecked
-            )
-
             self.results_table.setItem(row_index, 0, model_item)
             self.results_table.setItem(row_index, 1, response_item)
-            self.results_table.setItem(row_index, 2, select_item)
+            self.results_table.setCellWidget(
+                row_index,
+                2,
+                self._create_select_checkbox(row_index, row.selected),
+            )
 
         resize_table_rows(self.results_table)
-        self.results_table.setSortingEnabled(True)
-        self.results_table.itemChanged.connect(self._on_result_item_changed)
         self._update_action_buttons()
 
-    def _on_result_item_changed(self, item: QTableWidgetItem) -> None:
-        if item.column() != 2:
-            return
-        self.session.set_selected(item.row(), item.checkState() == Qt.CheckState.Checked)
+    def _create_select_checkbox(self, row_index: int, checked: bool) -> QWidget:
+        container = QWidget()
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(0, 8, 0, 0)
+        layout.setSpacing(0)
+
+        checkbox = QCheckBox()
+        checkbox.setChecked(checked)
+        checkbox.stateChanged.connect(
+            lambda _state, index=row_index, cb=checkbox: self._on_checkbox_changed(
+                index, cb.isChecked()
+            )
+        )
+        layout.addWidget(
+            checkbox,
+            alignment=Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop,
+        )
+        layout.addStretch(1)
+        return container
+
+    def _on_checkbox_changed(self, row_index: int, checked: bool) -> None:
+        self.session.set_selected(row_index, checked)
 
     def _on_open_response(self, row: int = -1, _column: int = -1) -> None:
         if row < 0:
@@ -371,10 +387,7 @@ class QueryTab(QWidget):
         self._clear_results_table()
 
     def _clear_results_table(self) -> None:
-        try:
-            self.results_table.itemChanged.disconnect(self._on_result_item_changed)
-        except TypeError:
-            pass
+        self.results_table.clearContents()
         self.results_table.setRowCount(0)
         self._update_action_buttons()
 
