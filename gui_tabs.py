@@ -510,13 +510,19 @@ class SettingsTab(QWidget):
 
         self.timeout_input = QSpinBox()
         self.timeout_input.setRange(5, 600)
-        self.theme_input = QLineEdit()
+        self.theme_combo = QComboBox()
+        self.theme_combo.addItem("Светлая", "light")
+        self.theme_combo.addItem("Тёмная", "dark")
+        self.font_size_input = QSpinBox()
+        self.font_size_input.setRange(8, 24)
+        self.font_size_input.setSuffix(" pt")
         self.assistant_model_combo = QComboBox()
         self.db_path_label = QLabel()
 
         form = QFormLayout()
         form.addRow("Таймаут запросов (сек):", self.timeout_input)
-        form.addRow("Тема (light/dark):", self.theme_input)
+        form.addRow("Тема:", self.theme_combo)
+        form.addRow("Размер шрифта:", self.font_size_input)
         form.addRow("Модель для улучшения промта:", self.assistant_model_combo)
         form.addRow("Файл базы данных:", self.db_path_label)
 
@@ -535,7 +541,13 @@ class SettingsTab(QWidget):
         self.timeout_input.setValue(
             int(db.get_setting("request_timeout", "60") or "60")
         )
-        self.theme_input.setText(db.get_setting("theme", "light") or "light")
+        theme = db.get_setting("theme", "light") or "light"
+        theme_index = self.theme_combo.findData(theme)
+        if theme_index >= 0:
+            self.theme_combo.setCurrentIndex(theme_index)
+        self.font_size_input.setValue(
+            int(db.get_setting("font_size", "10") or "10")
+        )
         self.db_path_label.setText(str(db.get_db_path()))
 
         selected_id = db.get_setting("assistant_model_id")
@@ -550,8 +562,9 @@ class SettingsTab(QWidget):
 
     def _on_save(self) -> None:
         db.set_setting("request_timeout", str(self.timeout_input.value()))
-        theme = self.theme_input.text().strip() or "light"
+        theme = self.theme_combo.currentData() or "light"
         db.set_setting("theme", theme)
+        db.set_setting("font_size", str(self.font_size_input.value()))
         if self.assistant_model_combo.currentData() is not None:
             db.set_setting(
                 "assistant_model_id",

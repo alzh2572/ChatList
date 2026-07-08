@@ -77,6 +77,7 @@ DEFAULT_SETTINGS = {
     "db_path": "chatlist.db",
     "request_timeout": "60",
     "theme": "light",
+    "font_size": "10",
 }
 
 

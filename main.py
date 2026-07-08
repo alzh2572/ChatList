@@ -526,6 +526,13 @@ class MainWindow(QMainWindow):
         self.tabs.setCurrentWidget(self.query_tab)
 
     def _apply_theme(self) -> None:
+        app = QApplication.instance()
+        if app is not None:
+            font = app.font()
+            font_size = int(db.get_setting("font_size", "10") or "10")
+            font.setPointSize(font_size)
+            app.setFont(font)
+
         theme = db.get_setting("theme", "light") or "light"
         if theme.lower() == "dark":
             self.setStyleSheet(
