@@ -1,6 +1,8 @@
 import sys
+from pathlib import Path
 
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
+from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -36,6 +38,7 @@ from session import QuerySession
 from table_utils import connect_search, resize_table_rows, setup_multiline_table
 
 logger = get_logger()
+APP_ICON = Path(__file__).parent / "app.ico"
 
 
 class ImprovePromptWorker(QThread):
@@ -556,6 +559,7 @@ class MainWindow(QMainWindow):
 
 def main() -> None:
     app = QApplication(sys.argv)
+    app.setWindowIcon(QIcon(str(APP_ICON)))
     window = MainWindow()
     window.show()
     sys.exit(app.exec())
