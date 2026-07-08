@@ -107,6 +107,7 @@ def init_db(db_path: Path | str | None = None) -> None:
         conn.executescript(SCHEMA_SQL)
         _seed_defaults(conn)
         _ensure_openrouter_models(conn)
+        _ensure_assistant_model_default(conn)
         conn.commit()
     finally:
         conn.close()
@@ -161,6 +162,25 @@ def _ensure_openrouter_models(conn: sqlite3.Connection) -> None:
     for row in extra:
         conn.execute("DELETE FROM results WHERE model_id = ?", (row["id"],))
         conn.execute("DELETE FROM models WHERE id = ?", (row["id"],))
+
+
+def _ensure_assistant_model_default(conn: sqlite3.Connection) -> None:
+    row = conn.execute(
+        "SELECT value FROM settings WHERE key = 'assistant_model_id'"
+    ).fetchone()
+    if row is not None:
+        return
+
+    model = conn.execute(
+        "SELECT id FROM models WHERE is_active = 1 ORDER BY name LIMIT 1"
+    ).fetchone()
+    if model is None:
+        return
+
+    conn.execute(
+        "INSERT INTO settings (key, value) VALUES (?, ?)",
+        ("assistant_model_id", str(model["id"])),
+    )
 
 
 # --- prompts ---

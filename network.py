@@ -37,6 +37,7 @@ def send_prompt_to_model(
     prompt: str,
     model: AIModel,
     timeout: float | None = None,
+    system_message: str | None = None,
 ) -> ModelResponse:
     if timeout is None:
         timeout = float(db.get_setting("request_timeout", "60") or "60")
@@ -62,6 +63,11 @@ def send_prompt_to_model(
         "model": model.name,
         "messages": [{"role": "user", "content": prompt}],
     }
+    if system_message:
+        payload["messages"] = [
+            {"role": "system", "content": system_message},
+            {"role": "user", "content": prompt},
+        ]
 
     try:
         logger.info("Запрос к модели %s (%s)", model.name, model.api_url)

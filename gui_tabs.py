@@ -5,6 +5,7 @@ from __future__ import annotations
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QCheckBox,
+    QComboBox,
     QDialog,
     QDialogButtonBox,
     QFileDialog,
@@ -510,11 +511,13 @@ class SettingsTab(QWidget):
         self.timeout_input = QSpinBox()
         self.timeout_input.setRange(5, 600)
         self.theme_input = QLineEdit()
+        self.assistant_model_combo = QComboBox()
         self.db_path_label = QLabel()
 
         form = QFormLayout()
         form.addRow("Таймаут запросов (сек):", self.timeout_input)
         form.addRow("Тема (light/dark):", self.theme_input)
+        form.addRow("Модель для улучшения промта:", self.assistant_model_combo)
         form.addRow("Файл базы данных:", self.db_path_label)
 
         save_btn = QPushButton("Сохранить настройки")
@@ -535,9 +538,24 @@ class SettingsTab(QWidget):
         self.theme_input.setText(db.get_setting("theme", "light") or "light")
         self.db_path_label.setText(str(db.get_db_path()))
 
+        selected_id = db.get_setting("assistant_model_id")
+        self.assistant_model_combo.clear()
+        selected_index = 0
+        for index, model in enumerate(db.list_active_models()):
+            self.assistant_model_combo.addItem(model["name"], model["id"])
+            if selected_id and str(model["id"]) == str(selected_id):
+                selected_index = index
+        if self.assistant_model_combo.count() > 0:
+            self.assistant_model_combo.setCurrentIndex(selected_index)
+
     def _on_save(self) -> None:
         db.set_setting("request_timeout", str(self.timeout_input.value()))
         theme = self.theme_input.text().strip() or "light"
         db.set_setting("theme", theme)
+        if self.assistant_model_combo.currentData() is not None:
+            db.set_setting(
+                "assistant_model_id",
+                str(self.assistant_model_combo.currentData()),
+            )
         QMessageBox.information(self, "ChatList", "Настройки сохранены.")
         self.settings_saved.emit()

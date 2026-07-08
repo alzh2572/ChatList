@@ -53,3 +53,14 @@ def get_model_by_id(model_id: int) -> AIModel | None:
     if row is None:
         return None
     return AIModel.from_row(row)
+
+
+def get_assistant_model() -> AIModel | None:
+    model_id = db.get_setting("assistant_model_id")
+    if model_id:
+        model = get_model_by_id(int(model_id))
+        if model is not None and model.is_active:
+            return model
+
+    active_models = get_active_models()
+    return active_models[0] if active_models else None

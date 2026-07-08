@@ -15,6 +15,7 @@ from PyQt6.QtWidgets import (
     QPlainTextEdit,
     QProgressBar,
     QPushButton,
+    QDialog,
     QTabWidget,
     QTableWidget,
     QTableWidgetItem,
@@ -27,12 +28,41 @@ from export_utils import default_export_path, export_to_json, export_to_markdown
 from gui_tabs import HistoryTab, ModelsTab, PromptsTab, SettingsTab
 from log_utils import get_logger
 from markdown_viewer import MarkdownViewDialog, format_response_markdown
-from models import get_active_models
+from models import get_active_models, get_assistant_model
 from network import ModelResponse, send_prompt_to_all_models
+from prompt_assistant import PromptImprovementResult, improve_prompt
+from prompt_assistant_dialog import PromptAssistantDialog
 from session import QuerySession
 from table_utils import connect_search, resize_table_rows, setup_multiline_table
 
 logger = get_logger()
+
+
+class ImprovePromptWorker(QThread):
+    finished = pyqtSignal(object)
+    failed = pyqtSignal(str)
+
+    def __init__(self, prompt: str) -> None:
+        super().__init__()
+        self.prompt = prompt
+
+    def run(self) -> None:
+        try:
+            model = get_assistant_model()
+            if model is None:
+                self.failed.emit(
+                    "Нет активной модели для ассистента. Настройте её на вкладке «Настройки»."
+                )
+                return
+            logger.info("Улучшение промта через модель %s", model.name)
+            result = improve_prompt(self.prompt, model)
+            if result.error and not result.improved:
+                self.failed.emit(result.error)
+                return
+            self.finished.emit(result)
+        except Exception as exc:
+            logger.exception("Ошибка при улучшении промта")
+            self.failed.emit(str(exc))
 
 
 class RequestWorker(QThread):
@@ -61,6 +91,7 @@ class QueryTab(QWidget):
         super().__init__(parent)
         self.session = QuerySession()
         self.worker: RequestWorker | None = None
+        self.improve_worker: ImprovePromptWorker | None = None
 
         layout = QVBoxLayout(self)
         layout.addWidget(self._build_prompt_section())
@@ -79,9 +110,14 @@ class QueryTab(QWidget):
         self.prompt_input.setMaximumHeight(120)
 
         send_row = QHBoxLayout()
+        self.improve_button = QPushButton("Улучшить промт")
+        self.improve_button.clicked.connect(self._on_improve_prompt)
+        self.improve_button.setEnabled(False)
         self.send_button = QPushButton("Отправить")
         self.send_button.clicked.connect(self._on_send)
+        self.prompt_input.textChanged.connect(self._update_prompt_buttons)
         send_row.addStretch()
+        send_row.addWidget(self.improve_button)
         send_row.addWidget(self.send_button)
 
         section_layout.addWidget(QLabel("Сохранённые промты:"))
@@ -184,6 +220,42 @@ class QueryTab(QWidget):
         record = db.get_prompt(int(prompt_id))
         if record:
             self.prompt_input.setPlainText(record["prompt"])
+
+    def _update_prompt_buttons(self) -> None:
+        has_text = bool(self.prompt_input.toPlainText().strip())
+        loading = self.progress.isVisible()
+        self.improve_button.setEnabled(has_text and not loading)
+        self.send_button.setEnabled(not loading)
+
+    def _on_improve_prompt(self) -> None:
+        prompt_text = self.prompt_input.toPlainText().strip()
+        if not prompt_text:
+            QMessageBox.warning(self, "ChatList", "Введите текст промта.")
+            return
+
+        if get_assistant_model() is None:
+            QMessageBox.warning(
+                self,
+                "ChatList",
+                "Нет модели для улучшения промта. Выберите модель на вкладке «Настройки».",
+            )
+            return
+
+        self._set_loading(True)
+        self.improve_worker = ImprovePromptWorker(prompt_text)
+        self.improve_worker.finished.connect(self._on_improve_finished)
+        self.improve_worker.failed.connect(self._on_improve_failed)
+        self.improve_worker.start()
+
+    def _on_improve_finished(self, result: PromptImprovementResult) -> None:
+        self._set_loading(False)
+        dialog = PromptAssistantDialog(result, self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self.prompt_input.setPlainText(dialog.get_selected_text())
+
+    def _on_improve_failed(self, message: str) -> None:
+        self._set_loading(False)
+        QMessageBox.critical(self, "ChatList", f"Не удалось улучшить промт:\n{message}")
 
     def _on_send(self) -> None:
         prompt_text = self.prompt_input.toPlainText().strip()
@@ -393,13 +465,17 @@ class QueryTab(QWidget):
 
     def _set_loading(self, loading: bool) -> None:
         self.progress.setVisible(loading)
-        self.send_button.setEnabled(not loading)
         self.new_button.setEnabled(not loading)
         if loading:
             self.save_button.setEnabled(False)
             self.open_button.setEnabled(False)
             self.export_md_button.setEnabled(False)
             self.export_json_button.setEnabled(False)
+            self.improve_button.setEnabled(False)
+            self.send_button.setEnabled(False)
+        else:
+            self._update_prompt_buttons()
+            self._update_action_buttons()
 
     def _update_action_buttons(self) -> None:
         has_results = self.session.has_results()
