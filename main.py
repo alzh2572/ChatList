@@ -26,8 +26,9 @@ from PyQt6.QtWidgets import (
 )
 
 import db
+from about_dialog import AboutDialog
 from export_utils import default_export_path, export_to_json, export_to_markdown
-from gui_tabs import HistoryTab, ModelsTab, PromptsTab, SettingsTab
+from gui_tabs import HelpTab, HistoryTab, ModelsTab, PromptsTab, SettingsTab
 from log_utils import get_logger
 from markdown_viewer import MarkdownViewDialog, format_response_markdown
 from models import get_active_models, get_assistant_model
@@ -504,12 +505,14 @@ class MainWindow(QMainWindow):
         self.prompts_tab = PromptsTab()
         self.history_tab = HistoryTab()
         self.settings_tab = SettingsTab()
+        self.help_tab = HelpTab()
 
         self.tabs.addTab(self.query_tab, "Запрос")
         self.tabs.addTab(self.models_tab, "Модели")
         self.tabs.addTab(self.prompts_tab, "Промты")
         self.tabs.addTab(self.history_tab, "История")
         self.tabs.addTab(self.settings_tab, "Настройки")
+        self.tabs.addTab(self.help_tab, "Справка")
 
         self.setCentralWidget(self.tabs)
 
@@ -520,6 +523,10 @@ class MainWindow(QMainWindow):
         self.query_tab.saved.connect(self.history_tab.reload)
         self.query_tab.saved.connect(self.prompts_tab.reload)
         self.settings_tab.settings_saved.connect(self._apply_theme)
+        self.help_tab.about_requested.connect(self._show_about)
+
+    def _show_about(self) -> None:
+        AboutDialog(APP_ICON, self).exec()
 
     def _on_use_prompt(self, prompt_id: int, prompt_text: str) -> None:
         self.query_tab.select_prompt(prompt_id, prompt_text)

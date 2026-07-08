@@ -572,3 +572,25 @@ class SettingsTab(QWidget):
             )
         QMessageBox.information(self, "ChatList", "Настройки сохранены.")
         self.settings_saved.emit()
+
+
+class HelpTab(QWidget):
+    about_requested = pyqtSignal()
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+
+        intro = QLabel(
+            "ChatList отправляет один промт в несколько нейросетей и позволяет "
+            "сравнить ответы, сохранить лучшие и экспортировать результаты."
+        )
+        intro.setWordWrap(True)
+
+        about_btn = QPushButton("О программе...")
+        about_btn.clicked.connect(self.about_requested.emit)
+
+        layout = QVBoxLayout(self)
+        layout.addWidget(QLabel("Справка"))
+        layout.addWidget(intro)
+        layout.addWidget(about_btn)
+        layout.addStretch()
