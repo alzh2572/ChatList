@@ -37,6 +37,7 @@ from prompt_assistant import PromptImprovementResult, improve_prompt
 from prompt_assistant_dialog import PromptAssistantDialog
 from session import QuerySession
 from table_utils import connect_search, resize_table_rows, setup_multiline_table
+from version import __version__
 
 logger = get_logger()
 APP_ICON = Path(__file__).parent / "app.ico"
@@ -493,11 +494,11 @@ class QueryTab(QWidget):
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
-        self.setWindowTitle("ChatList")
+        self.setWindowTitle(f"ChatList {__version__}")
         self.resize(980, 680)
 
         db.init_db()
-        logger.info("Приложение ChatList запущено")
+        logger.info("Приложение ChatList %s запущено", __version__)
 
         self.tabs = QTabWidget()
         self.query_tab = QueryTab()
@@ -573,6 +574,8 @@ class MainWindow(QMainWindow):
 
 def main() -> None:
     app = QApplication(sys.argv)
+    app.setApplicationName("ChatList")
+    app.setApplicationVersion(__version__)
     app.setWindowIcon(QIcon(str(APP_ICON)))
     window = MainWindow()
     window.show()

@@ -5,6 +5,8 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
+from version import __version__
+
 LOG_DIR = Path("logs")
 LOG_FILE = LOG_DIR / "chatlist.log"
 
@@ -23,7 +25,9 @@ def get_logger() -> logging.Logger:
     if not logger.handlers:
         handler = logging.FileHandler(LOG_FILE, encoding="utf-8")
         handler.setFormatter(
-            logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
+            logging.Formatter(
+                f"%(asctime)s [%(levelname)s] [v{__version__}] %(message)s"
+            )
         )
         logger.addHandler(handler)
 

@@ -58,14 +58,18 @@ python main.py
 | `export_utils.py` | Экспорт MD/JSON |
 | `log_utils.py` | Логирование |
 
-## Сборка exe
+## Сборка exe и установщика
+
+Версия приложения задаётся в `version.py` (`__version__`).
 
 ```powershell
 pip install pyinstaller
-pyinstaller --onefile --windowed --name ChatList main.py
+.\build.ps1
 ```
 
-Исполняемый файл: `dist\ChatList.exe`
+Результат:
+- `dist\ChatList-<версия>.exe` — исполняемый файл
+- `dist\ChatList-<версия>-setup.exe` — установщик (если установлен Inno Setup)
 
 ## Документация
 
