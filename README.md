@@ -73,16 +73,22 @@ pip install pyinstaller
 
 ## Публикация на GitHub
 
-Пошаговая инструкция: **[PUBLISHING.md](PUBLISHING.md)**
+| Ресурс | Ссылка |
+|--------|--------|
+| **Лендинг (Pages)** | https://alzh2572.github.io/ChatList/ |
+| **Releases** | https://github.com/alzh2572/ChatList/releases |
+| **Инструкция** | [PUBLISHING.md](PUBLISHING.md) |
 
-- **GitHub Release** — установщик и portable (workflow по тегу `v*`)
-- **GitHub Pages** — лендинг в папке `docs/` ([шаблон](docs/index.html))
+**Быстрый Release:**
 
 ```powershell
 .\scripts\prepare-release.ps1
 git tag v1.0.0
 git push origin main --tags
 ```
+
+- **GitHub Release** — установщик и portable (workflow по тегу `v*`)
+- **GitHub Pages** — лендинг в [docs/index.html](docs/index.html)
 
 ## Документация
 

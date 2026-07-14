@@ -1,79 +1,146 @@
 # Публикация ChatList на GitHub
 
-Пошаговая инструкция: GitHub Release (дистрибутивы) и GitHub Pages (лендинг).
+Пошаговая инструкция: **GitHub Release** (Windows-дистрибутивы) и **GitHub Pages** (HTML-лендинг).
 
 ---
 
-## Подготовка (один раз)
+## Быстрый старт
 
-### 1. Создайте репозиторий на GitHub
+| Цель | Команды |
+|------|---------|
+| **Первый раз** | `git push origin main` → включить Pages → проверить Actions |
+| **Новый Release** | обновить `version.py` → `.\scripts\prepare-release.ps1` → `git tag vX.Y.Z` → `git push origin main --tags` |
+| **Обновить лендинг** | правки в `docs/` → `git push origin main` |
+
+**Ссылки проекта:**
+- Репозиторий: https://github.com/alzh2572/ChatList
+- Лендинг: https://alzh2572.github.io/ChatList/
+- Releases: https://github.com/alzh2572/ChatList/releases
+
+---
+
+## Файлы и шаблоны
+
+```
+docs/
+  index.html                    # HTML-лендинг
+  config.js                     # owner/repo для ссылок и GitHub API
+
+.github/
+  RELEASE_NOTES.template.md     # шаблон описания Release ({{VERSION}})
+  workflows/
+    pages.yml                   # деплой лендинга на GitHub Pages
+    release.yml                 # сборка exe + Release по тегу v*
+
+scripts/
+  prepare-release.ps1           # локальная сборка, checksums, release notes
+
+PUBLISHING.md                   # эта инструкция
+build.ps1                       # PyInstaller + Inno Setup
+version.py                      # единственный источник версии (__version__)
+```
+
+---
+
+## Часть 1. Первоначальная настройка (один раз)
+
+### Шаг 1. Отправьте код на GitHub
 
 ```powershell
 cd c:\Work\ChatList
-git remote add origin https://github.com/YOUR_GITHUB_USERNAME/ChatList.git
-git push -u origin main
+git remote -v
+git push origin main
 ```
 
-### 2. Укажите репозиторий в лендинге
+Remote уже настроен: `https://github.com/alzh2572/ChatList.git`
 
-Откройте `docs/config.js` и замените placeholder:
+### Шаг 2. Лендинг — репозиторий в config.js
+
+В `docs/config.js`:
 
 ```javascript
-window.CHATLIST_REPO = "YOUR_GITHUB_USERNAME/ChatList";
+window.CHATLIST_REPO = "alzh2572/ChatList";
 ```
 
-### 3. Включите GitHub Pages
+Лендинг (`docs/index.html`) автоматически подтягивает последний Release через GitHub API и показывает кнопки «Скачать».
 
-1. Откройте репозиторий на GitHub → **Settings** → **Pages**
-2. В **Build and deployment** → **Source** выберите **GitHub Actions**
-3. После первого push в `docs/` или ручного запуска workflow **Deploy GitHub Pages** сайт будет доступен по адресу:
+**Локальный предпросмотр:**
 
+```powershell
+cd c:\Work\ChatList\docs
+python -m http.server 8080
 ```
-https://YOUR_GITHUB_USERNAME.github.io/ChatList/
+
+Откройте http://localhost:8080
+
+### Шаг 3. Включите GitHub Pages
+
+Pages уже включены (`build_type: workflow`). Если нужно включить заново:
+
+**Веб:** [Settings → Pages](https://github.com/alzh2572/ChatList/settings/pages) → **Source** → **GitHub Actions**
+
+**CLI:**
+
+```powershell
+gh api --method POST repos/alzh2572/ChatList/pages -f build_type=workflow
 ```
 
-### 4. Проверьте workflows
+### Шаг 4. Проверьте workflows
 
-В репозитории должны появиться два workflow:
+После `git push origin main` в [Actions](https://github.com/alzh2572/ChatList/actions) должны появиться:
 
-| Файл | Назначение |
-|------|------------|
-| `.github/workflows/pages.yml` | Публикация лендинга из папки `docs/` |
-| `.github/workflows/release.yml` | Сборка Windows и создание Release по тегу `v*` |
+| Workflow | Файл | Когда запускается |
+|----------|------|-------------------|
+| Deploy GitHub Pages | `pages.yml` | push в `docs/` или вручную |
+| Release | `release.yml` | push тега `v*` |
+
+```powershell
+Get-ChildItem .github\workflows
+gh workflow list -R alzh2572/ChatList
+gh workflow run "Deploy GitHub Pages" --ref main
+```
+
+> **Важно:** если workflows не видны на GitHub — выполните `git push origin main` (локальная ветка может быть впереди origin).
 
 ---
 
-## Публикация новой версии (GitHub Release)
+## Часть 2. Публикация Release (новая версия)
 
 ### Шаг 1. Обновите версию
 
-Единственный источник версии — `version.py`:
+Единственный источник — `version.py`:
 
 ```python
 __version__ = "1.0.0"
 ```
 
-### Шаг 2. Заполните список изменений
+### Шаг 2. Заполните «Что нового»
 
-Отредактируйте блок «Что нового» в `.github/RELEASE_NOTES.template.md` (или позже — в сгенерированном `dist/RELEASE_NOTES.md`).
+Отредактируйте блок в `.github/RELEASE_NOTES.template.md`:
 
-### Шаг 3. Соберите артефакты локально (рекомендуется)
+```markdown
+### Что нового
+
+- описание изменений
+```
+
+### Шаг 3. Соберите артефакты локально
 
 ```powershell
 cd c:\Work\ChatList
 .\scripts\prepare-release.ps1
 ```
 
-Скрипт:
-- запускает `build.ps1` (exe + установщик Inno Setup);
-- создаёт `dist/checksums.txt` (SHA256);
-- создаёт `dist/RELEASE_NOTES.md` из шаблона.
+Скрипт создаёт:
+- `dist/ChatList-<версия>.exe` — portable
+- `dist/ChatList-<версия>-setup.exe` — установщик Inno Setup
+- `dist/checksums.txt` — SHA256
+- `dist/RELEASE_NOTES.md` — текст для Release
 
-Проверьте и допишите «Что нового» в `dist/RELEASE_NOTES.md`.
+Проверьте и допишите `dist/RELEASE_NOTES.md`.  
+Если сборка уже выполнена: `.\scripts\prepare-release.ps1 -SkipBuild`
 
-> Если сборка уже выполнена: `.\scripts\prepare-release.ps1 -SkipBuild`
-
-### Шаг 4. Закоммитьте и создайте тег
+### Шаг 4. Коммит, тег и push
 
 ```powershell
 git add version.py .github/RELEASE_NOTES.template.md
@@ -83,29 +150,50 @@ git push origin main
 git push origin v1.0.0
 ```
 
-**Важно:** тег должен начинаться с `v` (например `v1.0.0`) — так настроен workflow `release.yml`.
+Тег **обязательно** с префиксом `v` (`v1.0.0`, не `1.0.0`).
 
 ### Шаг 5. Дождитесь GitHub Actions
 
-1. Откройте **Actions** → workflow **Release**
-2. После успешной сборки в **Releases** появятся файлы:
-   - `ChatList-1.0.0-setup.exe` — установщик
-   - `ChatList-1.0.0.exe` — portable
-   - `checksums.txt` — контрольные суммы
-
-### Шаг 6. Проверьте Release
+1. [Actions → Release](https://github.com/alzh2572/ChatList/actions/workflows/release.yml)
+2. В [Releases](https://github.com/alzh2572/ChatList/releases) появятся:
+   - `ChatList-1.0.0-setup.exe`
+   - `ChatList-1.0.0.exe`
+   - `checksums.txt`
 
 ```powershell
 gh release view v1.0.0
 ```
 
-Или откройте: `https://github.com/YOUR_GITHUB_USERNAME/ChatList/releases`
+### Шаг 6. Проверьте лендинг
+
+После Release кнопки на https://alzh2572.github.io/ChatList/ начнут вести на актуальные файлы.
 
 ---
 
-## Публикация вручную (без Actions)
+## Часть 3. Публикация лендинга (GitHub Pages)
 
-Если workflow недоступен:
+### Автоматически
+
+При push в `main` с изменениями в `docs/`:
+
+```powershell
+git add docs/
+git commit -m "Обновить лендинг"
+git push origin main
+```
+
+### Вручную
+
+[Actions → Deploy GitHub Pages → Run workflow](https://github.com/alzh2572/ChatList/actions/workflows/pages.yml)
+
+```powershell
+gh workflow run "Deploy GitHub Pages" --ref main
+gh run list --workflow=pages.yml
+```
+
+---
+
+## Release вручную (без Actions)
 
 ```powershell
 .\scripts\prepare-release.ps1
@@ -120,62 +208,16 @@ gh release create v1.0.0 `
 
 ---
 
-## Публикация лендинга (GitHub Pages)
-
-### Автоматически
-
-При push в `main` с изменениями в `docs/` запускается workflow **Deploy GitHub Pages**.
-
-```powershell
-git add docs/
-git commit -m "Обновить лендинг"
-git push origin main
-```
-
-### Вручную
-
-1. **Actions** → **Deploy GitHub Pages** → **Run workflow**
-
-### Локальный предпросмотр
-
-```powershell
-cd c:\Work\ChatList\docs
-python -m http.server 8080
-```
-
-Откройте `http://localhost:8080` (кнопки скачивания заработают после публикации Release и настройки `config.js`).
-
----
-
-## Структура файлов публикации
-
-```
-docs/
-  index.html          # HTML-лендинг
-  config.js           # имя репозитория для ссылок и API
-
-.github/
-  RELEASE_NOTES.template.md   # шаблон описания Release
-  workflows/
-    pages.yml         # деплой GitHub Pages
-    release.yml       # сборка и Release по тегу
-
-scripts/
-  prepare-release.ps1 # локальная подготовка Release
-```
-
----
-
 ## Чек-лист перед релизом
 
 - [ ] `version.py` обновлён
 - [ ] `.github/RELEASE_NOTES.template.md` — заполнен блок «Что нового»
-- [ ] `docs/config.js` — указан правильный `username/ChatList`
-- [ ] Локальная сборка `.\build.ps1` проходит без ошибок
-- [ ] Тег `vX.Y.Z` создан и отправлен на GitHub
+- [ ] `docs/config.js` — `alzh2572/ChatList`
+- [ ] `.\build.ps1` проходит без ошибок
+- [ ] Тег `vX.Y.Z` создан и отправлен
 - [ ] Workflow **Release** завершился успешно
-- [ ] На лендинге отображается версия и работают кнопки скачивания
-- [ ] Установщик и portable запускаются на чистой Windows
+- [ ] Лендинг показывает версию и кнопки скачивания
+- [ ] Установщик и portable работают на Windows
 
 ---
 
@@ -183,11 +225,11 @@ scripts/
 
 | Проблема | Решение |
 |----------|---------|
+| Workflows не видны | `git push origin main` |
 | Pages не открывается | Settings → Pages → Source = **GitHub Actions** |
 | Кнопки «Скачать» неактивны | Опубликуйте Release; проверьте `docs/config.js` |
 | Release workflow не запустился | Тег должен быть `v1.0.0`, не `1.0.0` |
 | Inno Setup не найден в CI | Workflow ставит через `choco install innosetup` |
-| Дублирование exe в Release | Используйте `prepare-release.ps1` / актуальный `release.yml` |
 
 ---
 
