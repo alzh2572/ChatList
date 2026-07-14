@@ -69,9 +69,24 @@ pip install pyinstaller
 
 Результат:
 - `dist\ChatList-<версия>.exe` — исполняемый файл
-- `dist\ChatList-<версия>-setup.exe` — установщик (если установлен Inno Setup)
+- `dist\ChatList-<версия>-setup.exe` — установщик (Inno Setup)
+
+## Публикация на GitHub
+
+Пошаговая инструкция: **[PUBLISHING.md](PUBLISHING.md)**
+
+- **GitHub Release** — установщик и portable (workflow по тегу `v*`)
+- **GitHub Pages** — лендинг в папке `docs/` ([шаблон](docs/index.html))
+
+```powershell
+.\scripts\prepare-release.ps1
+git tag v1.0.0
+git push origin main --tags
+```
 
 ## Документация
+
+- [PUBLISHING.md](PUBLISHING.md) — публикация Release и Pages
 
 - [PROJECT.md](PROJECT.md) — спецификация
 - [PLAN.md](PLAN.md) — план реализации

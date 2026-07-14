@@ -1,0 +1,71 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt pyinstaller
+
+      - name: Install Inno Setup
+        run: choco install innosetup -y
+
+      - name: Build
+        shell: pwsh
+        run: .\build.ps1
+
+      - name: Set version
+        id: version
+        shell: pwsh
+        run: |
+          $version = python -c "from version import __version__; print(__version__)"
+          echo "value=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Generate checksums
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.value }}"
+          $files = @(
+            "dist/ChatList-$version-setup.exe",
+            "dist/ChatList-$version.exe"
+          )
+          $lines = foreach ($file in $files) {
+            $hash = (Get-FileHash $file -Algorithm SHA256).Hash
+            "$hash  $(Split-Path $file -Leaf)"
+          }
+          $lines | Set-Content -Encoding utf8 "dist/checksums.txt"
+
+      - name: Prepare release notes
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.value }}"
+          $template = Get-Content ".github/RELEASE_NOTES.template.md" -Raw -Encoding UTF8
+          $notes = $template -replace '\{\{VERSION\}\}', $version
+          $notes | Set-Content -Encoding utf8 "dist/RELEASE_NOTES.md"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: dist/RELEASE_NOTES.md
+          files: |
+            dist/ChatList-${{ steps.version.outputs.value }}-setup.exe
+            dist/ChatList-${{ steps.version.outputs.value }}.exe
+            dist/checksums.txt
+          generate_release_notes: false
